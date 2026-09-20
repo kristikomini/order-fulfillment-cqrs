@@ -1,0 +1,131 @@
+@page "/orders"
+@rendermode InteractiveServer
+@inject LogiFlowApiClient Api
+@implements IDisposable
+
+<PageTitle>Orders — LogiFlow</PageTitle>
+
+<h1>Orders</h1>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Place an order</h5>
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Customer</label>
+                <input class="form-control" @bind="_customer" placeholder="ACME Logistics" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Product</label>
+                <select class="form-select" @bind="_selectedProductId">
+                    <option value="">— choose —</option>
+                    @foreach (var p in _products)
+                    {
+                        <option value="@p.Id">@p.Sku — @p.Name (avail @p.AvailableToPromise)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Qty</label>
+                <input type="number" min="1" class="form-control" @bind="_quantity" />
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" @onclick="PlaceOrder" disabled="@(!CanPlace)">Place</button>
+            </div>
+        </div>
+        @if (_message is not null)
+        {
+            <div class="alert @_messageClass mt-3 mb-0">@_message</div>
+        }
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">Recent orders</h5>
+    <button class="btn btn-sm btn-outline-secondary" @onclick="Refresh">Refresh</button>
+</div>
+
+<table class="table table-sm align-middle mt-2">
+    <thead>
+        <tr><th>Order #</th><th>Customer</th><th>Status</th><th class="text-end">Total</th><th>When</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var o in _orders)
+        {
+            <tr>
+                <td><code>@o.OrderNumber</code></td>
+                <td>@o.CustomerName</td>
+                <td><span class="badge @BadgeClass(o.Status)">@o.Status</span></td>
+                <td class="text-end">@o.Total.ToString("C")</td>
+                <td>@o.CreatedAt.LocalDateTime.ToString("HH:mm:ss")</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private IReadOnlyList<ProductDto> _products = new List<ProductDto>();
+    private IReadOnlyList<OrderDto> _orders = new List<OrderDto>();
+    private string _customer = "ACME Logistics";
+    private string? _selectedProductId;
+    private int _quantity = 1;
+    private string? _message;
+    private string _messageClass = "alert-info";
+    private Timer? _timer;
+
+    private bool CanPlace => !string.IsNullOrWhiteSpace(_customer)
+        && Guid.TryParse(_selectedProductId, out _) && _quantity > 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Refresh();
+        // Poll so the outbox-driven Confirmed → Fulfilled transition shows up live.
+        _timer = new Timer(async _ => await InvokeAsync(async () =>
+        {
+            await Refresh();
+            StateHasChanged();
+        }), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+    }
+
+    private async Task Refresh()
+    {
+        _products = await Api.GetProductsAsync();
+        _orders = await Api.GetOrdersAsync();
+    }
+
+    private async Task PlaceOrder()
+    {
+        if (!CanPlace) return;
+        try
+        {
+            var order = await Api.PlaceOrderAsync(_customer,
+                new[] { (Guid.Parse(_selectedProductId!), _quantity) });
+            if (order?.Status == "Rejected")
+            {
+                _message = $"Order {order.OrderNumber} rejected: {order.RejectionReason}";
+                _messageClass = "alert-warning";
+            }
+            else
+            {
+                _message = $"Order {order?.OrderNumber} placed and confirmed — fulfillment in progress.";
+                _messageClass = "alert-success";
+            }
+            await Refresh();
+        }
+        catch (Exception ex)
+        {
+            _message = $"Failed to place order: {ex.Message}";
+            _messageClass = "alert-danger";
+        }
+    }
+
+    private static string BadgeClass(string status) => status switch
+    {
+        "Confirmed" => "text-bg-primary",
+        "Fulfilled" => "text-bg-success",
+        "Rejected" => "text-bg-warning",
+        _ => "text-bg-secondary"
+    };
+
+    public void Dispose() => _timer?.Dispose();
+}

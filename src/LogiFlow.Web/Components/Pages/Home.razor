@@ -1,0 +1,62 @@
+@page "/"
+@inject LogiFlowApiClient Api
+
+<PageTitle>LogiFlow</PageTitle>
+
+<h1>LogiFlow</h1>
+<p class="lead">Logistics &amp; order-fulfillment platform — .NET 10, Clean Architecture, CQRS, transactional outbox.</p>
+
+@if (_loading)
+{
+    <p><em>Loading…</em></p>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-md-3">
+            <div class="card text-bg-light"><div class="card-body">
+                <h6 class="card-subtitle text-muted">Products</h6>
+                <p class="display-6 mb-0">@_products.Count</p>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-bg-light"><div class="card-body">
+                <h6 class="card-subtitle text-muted">Orders</h6>
+                <p class="display-6 mb-0">@_orders.Count</p>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-bg-light"><div class="card-body">
+                <h6 class="card-subtitle text-muted">Fulfilled</h6>
+                <p class="display-6 mb-0">@_orders.Count(o => o.Status == "Fulfilled")</p>
+            </div></div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-bg-light"><div class="card-body">
+                <h6 class="card-subtitle text-muted">Rejected</h6>
+                <p class="display-6 mb-0">@_orders.Count(o => o.Status == "Rejected")</p>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <a class="btn btn-primary" href="/orders">Place &amp; track orders</a>
+        <a class="btn btn-outline-secondary" href="/products">View inventory</a>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<ProductDto> _products = new List<ProductDto>();
+    private IReadOnlyList<OrderDto> _orders = new List<OrderDto>();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _products = await Api.GetProductsAsync();
+            _orders = await Api.GetOrdersAsync();
+        }
+        finally { _loading = false; }
+    }
+}

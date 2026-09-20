@@ -1,0 +1,18 @@
+## .NET
+bin/
+obj/
+out/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+.vs/
+.vscode/
+*.tsbuildinfo
+
+## Rider / Resharper
+.idea/
+
+## OS
+.DS_Store
+Thumbs.db

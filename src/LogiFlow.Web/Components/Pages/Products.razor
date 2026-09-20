@@ -1,0 +1,41 @@
+@page "/products"
+@inject LogiFlowApiClient Api
+
+<PageTitle>Inventory — LogiFlow</PageTitle>
+
+<h1>Inventory</h1>
+
+@if (_products is null)
+{
+    <p><em>Loading…</em></p>
+}
+else
+{
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>SKU</th><th>Name</th><th class="text-end">Unit price</th>
+                <th class="text-end">On hand</th><th class="text-end">Reserved</th>
+                <th class="text-end">Available</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in _products)
+            {
+                <tr>
+                    <td><code>@p.Sku</code></td>
+                    <td>@p.Name</td>
+                    <td class="text-end">@p.UnitPrice.ToString("C")</td>
+                    <td class="text-end">@p.StockOnHand</td>
+                    <td class="text-end">@p.StockReserved</td>
+                    <td class="text-end fw-bold">@p.AvailableToPromise</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<ProductDto>? _products;
+    protected override async Task OnInitializedAsync() => _products = await Api.GetProductsAsync();
+}
