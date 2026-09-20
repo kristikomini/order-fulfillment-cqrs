@@ -25,3 +25,27 @@ jobs:
 
       - name: Test
         run: dotnet test --no-build --configuration Release --verbosity normal
+
+  deploy:
+    # Only after tests pass, only on pushes to main, and only when the Coolify
+    # secret is present (so forks / PRs skip it cleanly).
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify deploy
+        env:
+          COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        run: |
+          if [ -z "$COOLIFY_WEBHOOK_URL" ] || [ -z "$COOLIFY_TOKEN" ]; then
+            echo "Coolify secrets not set — skipping deploy. Add COOLIFY_WEBHOOK_URL and COOLIFY_TOKEN in repo settings to enable."
+            exit 0
+          fi
+          echo "Triggering Coolify redeploy..."
+          http_code=$(curl -sS -o /tmp/resp -w "%{http_code}" \
+            --request GET "$COOLIFY_WEBHOOK_URL" \
+            --header "Authorization: Bearer $COOLIFY_TOKEN")
+          echo "Coolify responded HTTP $http_code"
+          cat /tmp/resp || true
+          [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]
