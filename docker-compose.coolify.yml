@@ -1,0 +1,68 @@
+# =============================================================================
+# LogiFlow platform, live on a server. Coolify → Docker Compose → this file.
+#
+#   Resource type   Docker Compose (from a GitHub repository)
+#   Base directory  /
+#   Compose file    /docker-compose.coolify.yml
+#
+# Three containers on one box:
+#   web    — the Blazor UI, the ONLY public service (Traefik attaches the FQDN)
+#   api    — the REST API, reached only from `web` over the internal network
+#   sqledge— Azure SQL Edge: the SQL Server engine, lightweight and ARM-capable,
+#            so the same EF Core migrations run unchanged on a small host.
+#
+# Approx footprint: ~1 GB RAM at rest (SQL Edge ~700 MB, two .NET apps ~150 MB
+# each). Full walkthrough — DNS, secrets, first boot — in deploy/coolify/README.md
+# =============================================================================
+
+name: logiflow-platform
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    environment:
+      # Coolify magic: declaring the variable (no value) tells it to generate or
+      # attach an FQDN for this service and point the proxy at container port
+      # 8080. Set the real domain (logiflow.testdemo.it) in Coolify afterwards.
+      - SERVICE_FQDN_WEB_8080
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_HTTP_PORTS=8080
+      # Server-side Blazor calls the API over the internal Docker network.
+      - ApiBaseUrl=http://api:8080/
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__Default=Server=sqledge,1433;Database=LogiFlow;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=False
+    depends_on:
+      sqledge:
+        condition: service_healthy
+
+  sqledge:
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+    volumes:
+      - sqledge-data:/var/opt/mssql
+    healthcheck:
+      # Azure SQL Edge ships the go-sqlcmd client at /opt/mssql-tools/bin.
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+volumes:
+  sqledge-data:

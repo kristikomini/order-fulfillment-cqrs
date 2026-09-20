@@ -1,7 +1,18 @@
 using LogiFlow.Web.Components;
 using LogiFlow.Web.Services;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Behind Coolify's Traefik proxy, TLS is terminated upstream and plain HTTP is
+// forwarded. Honour X-Forwarded-Proto/For so the app sees the real scheme and
+// client IP (and HTTPS redirection doesn't loop).
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -12,6 +23,8 @@ var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5080/"
 builder.Services.AddHttpClient<LogiFlowApiClient>(c => c.BaseAddress = new Uri(apiBaseUrl));
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
