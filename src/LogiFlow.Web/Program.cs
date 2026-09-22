@@ -1,6 +1,14 @@
+using System.Globalization;
 using LogiFlow.Web.Components;
 using LogiFlow.Web.Services;
 using Microsoft.AspNetCore.HttpOverrides;
+
+// Pin a fixed culture so currency/number formatting is deterministic regardless
+// of the host's locale. Containers default to the invariant culture, which
+// renders the generic "¤" currency symbol; this makes prices render as euro.
+var culture = CultureInfo.GetCultureInfo("it-IT");
+CultureInfo.DefaultThreadCurrentCulture = culture;
+CultureInfo.DefaultThreadCurrentUICulture = culture;
 
 var builder = WebApplication.CreateBuilder(args);
 
