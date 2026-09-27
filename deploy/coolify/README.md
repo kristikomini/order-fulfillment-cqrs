@@ -13,7 +13,7 @@ IP (same server as `hub.testdemo.it`). Give it a minute to propagate.
 ## 2. Create the resource in Coolify
 
 1. **+ New → Resource → Docker Compose** → *from a Git repository*.
-2. Repository: `https://github.com/kristikomini/logiflow-platform`, branch `main`.
+2. Repository: `https://github.com/kristikomini/order-fulfillment-cqrs`, branch `main`.
 3. **Base directory:** `/`
 4. **Compose file:** `/docker-compose.coolify.yml`
 5. Save. Coolify parses the file and shows three services (web, api, sqledge).

@@ -15,7 +15,7 @@
 # each). Full walkthrough — DNS, secrets, first boot — in deploy/coolify/README.md
 # =============================================================================
 
-name: logiflow-platform
+name: order-fulfillment-cqrs
 
 services:
   web:
